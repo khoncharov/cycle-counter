@@ -3,7 +3,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 
-#define PORT_SPEED 115200
 #define SENS_0_PIN A0
 #define INIT_DELAY 3000
 #define POLLING_DELAY 50
@@ -26,8 +25,6 @@ bool sens_low_lvl_flag = true;
 
 void setup() {
   pinMode(SENS_0_PIN, INPUT);
-
-  Serial.begin(PORT_SPEED);
 
   noInterrupts();
   TCCR1A = 0;               // init Timer1 - clear reg A

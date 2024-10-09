@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -16,6 +17,18 @@
 #define DISPLAY_W 128
 #define DISPLAY_H 64
 
+#define CYCLES_PER_SAVE 10
+#define TIME_FACTOR 1.22 / (CYCLES_PER_SAVE * 1000)  // 1.22 - time coeff; 1000 ms to s
+
+#define UPPER_THRESHOLD 700
+#define LOWER_THRESHOLD 200
+
+#define MEMO_DATA_SIZE 3  // bytes
+#define MEMO_BLOCKS 341
+#define MEMO_CELLS_NUM MEMO_DATA_SIZE* MEMO_BLOCKS  // 341 * 3 = 1023 | EEPROM size 1024 bytes for Atmega328p
+
+unsigned int memo_pos = 0;  // first byte in EEPROM which stores Count (2bytes) & CRC (1byte)
+
 // Create the OLED display
 Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_W, DISPLAY_H, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
@@ -29,6 +42,16 @@ unsigned long cycle_t0 = 0;          // t0 for 5 cycles
 volatile unsigned long cycle_T = 0;  // period of 5 cycles
 
 void setup() {
+  for (unsigned int pos = 0; pos < MEMO_CELLS_NUM; pos += MEMO_DATA_SIZE) {
+    unsigned int read_value;
+    EEPROM.get(pos, read_value);
+
+    if (read_value * CYCLES_PER_SAVE > count) {
+      count = read_value * CYCLES_PER_SAVE;
+      memo_pos = pos;
+    }
+  }
+
   pinMode(SENS_0_PIN, INPUT);
 
   noInterrupts();
@@ -52,18 +75,27 @@ void loop() {
   if (sens_read_t1 - sens_read_t0 >= SENS_POLLING_INTERVAL) {
     sens_read_t0 = sens_read_t1;
 
-
     sens_0 = analogRead(SENS_0_PIN);
 
-    if (sens_low_lvl_flag && sens_0 > 700) {
+    if (sens_low_lvl_flag && sens_0 > UPPER_THRESHOLD) {
       sens_low_lvl_flag = false;
     }
 
-    if (!sens_low_lvl_flag && sens_0 < 200) {
+    if (!sens_low_lvl_flag && sens_0 < LOWER_THRESHOLD) {
       sens_low_lvl_flag = true;
       count += 1;
 
-      if (!(count % 5) && count != 0) {
+      // if count reach number of cycle to save & excluding the case of count == 0
+      if (!(count % CYCLES_PER_SAVE) && count != 0) {
+        // Save data to EEPROM
+        memo_pos += MEMO_DATA_SIZE;
+        if (memo_pos >= MEMO_CELLS_NUM) {
+          memo_pos = 0;
+        }
+        unsigned int write_value = count / CYCLES_PER_SAVE;
+        EEPROM.put(memo_pos, write_value);
+
+        // Update cycle time
         cycle_T = sens_read_t1 - cycle_t0;
         cycle_t0 = sens_read_t1;
       }
@@ -85,9 +117,7 @@ ISR(TIMER1_COMPA_vect) {
   display.print("sens: ");
   display.println(sens_0);
   display.println();
-  display.print("T5: ");
-  // 1.22 - time coeff; 5 cycles; millis to s - /1000
-  float time_per_cycle = (float)cycle_T * 1.22 / 5000;
-  display.println(time_per_cycle);
+  display.print("T: ");
+  display.println((float)cycle_T * TIME_FACTOR);
   display.display();
 }
