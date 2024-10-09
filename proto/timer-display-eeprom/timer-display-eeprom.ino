@@ -25,7 +25,7 @@
 
 #define MEMO_DATA_SIZE 3  // bytes
 #define MEMO_BLOCKS 341
-#define MEMO_CELLS_NUM MEMO_DATA_SIZE* MEMO_BLOCKS  // 341 * 3 = 1023 | EEPROM size 1024 bytes for Atmega328p
+#define MEMO_CELLS_NUM (MEMO_DATA_SIZE * MEMO_BLOCKS)  // 341 * 3 = 1023 | EEPROM size 1024 bytes for Atmega328p
 
 unsigned int memo_pos = 0;  // first byte in EEPROM which stores Count (2bytes) & CRC (1byte)
 
@@ -38,8 +38,8 @@ unsigned long sens_read_t0 = 0;
 volatile unsigned int count = 0;
 bool sens_low_lvl_flag = true;
 
-unsigned long cycle_t0 = 0;          // t0 for 5 cycles
-volatile unsigned long cycle_T = 0;  // period of 5 cycles
+unsigned long cycle_t0 = 0;          // initial time for CYCLES_PER_SAVE
+volatile unsigned long cycle_T = 0;  // time period of CYCLES_PER_SAVE
 
 void setup() {
   for (unsigned int pos = 0; pos < MEMO_CELLS_NUM; pos += MEMO_DATA_SIZE) {
