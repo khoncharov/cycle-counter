@@ -18,7 +18,7 @@
 #define DISPLAY_H 64
 
 #define CYCLES_PER_SAVE 10
-#define TIME_FACTOR 1.22 / (CYCLES_PER_SAVE * 1000)  // 1.22 - time coeff; 1000 ms to s
+#define TIME_FACTOR 1.25 / (CYCLES_PER_SAVE * 1000)  // 1.25 - time coeff; 1000 ms to s
 
 #define UPPER_THRESHOLD 700
 #define LOWER_THRESHOLD 200
@@ -29,17 +29,18 @@
 
 unsigned int memo_pos = 0;  // first byte in EEPROM which stores Count (2bytes) & CRC (1byte)
 
-// Create the OLED display
-Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_W, DISPLAY_H, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
-
 volatile unsigned int sens_0 = 0;
-unsigned long sens_read_t0 = 0;
+unsigned long sens_read_t0;
+unsigned long sens_read_t1;
 
 volatile unsigned int count = 0;
 bool sens_low_lvl_flag = true;
 
 unsigned long cycle_t0 = 0;          // initial time for CYCLES_PER_SAVE
 volatile unsigned long cycle_T = 0;  // time period of CYCLES_PER_SAVE
+
+// Create the OLED display
+Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_W, DISPLAY_H, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
 void setup() {
   for (unsigned int pos = 0; pos < MEMO_CELLS_NUM; pos += MEMO_DATA_SIZE) {
@@ -67,10 +68,12 @@ void setup() {
   // Start OLED
   display.begin(0, true);  // we dont use the i2c address but we will reset!
   display.clearDisplay();
+
+  sens_read_t0 = millis();
 }
 
 void loop() {
-  unsigned long sens_read_t1 = millis();
+  sens_read_t1 = millis();
 
   if (sens_read_t1 - sens_read_t0 >= SENS_POLLING_INTERVAL) {
     sens_read_t0 = sens_read_t1;
@@ -106,18 +109,25 @@ void loop() {
 ISR(TIMER1_COMPA_vect) {
   display.clearDisplay();
 
-  // text display tests
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(2, 0);
+
   display.print("> ");
   display.println(count);
   display.println();
+
   display.setTextSize(1);
   display.print("sens: ");
   display.println(sens_0);
   display.println();
+
   display.print("T: ");
-  display.println((float)cycle_T * TIME_FACTOR);
+  if (cycle_T == 0) {
+    display.println("n-a");
+  } else {
+    display.println((float)cycle_T * TIME_FACTOR);
+  }
+
   display.display();
 }
