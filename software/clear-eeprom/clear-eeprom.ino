@@ -13,7 +13,7 @@ void setup() {
     }
     Serial.print(i);
     Serial.print(":");
-    Serial.print(EEPROM.read(i));
+    Serial.print(EEPROM.read(i), HEX);
     Serial.println();
     delay(10);
   }
