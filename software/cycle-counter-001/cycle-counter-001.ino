@@ -3,11 +3,14 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 #include <EEPROM.h>
+#include <Adafruit_ADS1X15.h>
 
 #define TICKS_NUM 31250  // pre-256 -> 31250 = 500 ms
 
-#define SENS_0_PIN A0
-#define SENS_POLLING_INTERVAL 10
+#define SENS_POLLING_INTERVAL 100
+
+#define MODULE_1_ADDRESS 0x48
+#define CHANNEL_1 0
 
 #define OLED_MOSI 11  // SDA pin D11 (default)
 #define OLED_CLK 13   // SCK pin D13 (default)
@@ -17,10 +20,14 @@
 #define DISPLAY_WIDTH 128
 #define DISPLAY_HEIGHT 64
 
-#define TIME_FACTOR 1.25 / (CYCLES_PER_SAVE * 1000)  // 1.25 - time coeff; 1000 ms to s
+#define TIME_FACTOR 1.3 / (CYCLES_PER_SAVE * 1000)  // 1.25 - time coeff; 1000 ms to s
 
-#define UPPER_THRESHOLD 700
-#define LOWER_THRESHOLD 200
+#define UPPER_THRESHOLD 12790  // pressure 760
+#define LOWER_THRESHOLD 12000  // pressure 720
+
+// Regression params - y(x) = k * x + b
+#define K_PARAM 0.075
+#define B_PARAM -200  // default -198.907
 
 #define MEMO_DATA_SIZE 3  // bytes
 #define MEMO_BLOCKS 341
@@ -40,13 +47,18 @@ bool sens_low_lvl_flag = true;
 unsigned long cycle_t0 = 0;          // initial time for CYCLES_PER_SAVE
 volatile unsigned long cycle_T = 0;  // time period of CYCLES_PER_SAVE
 
-// Create the OLED display
+// ADS1115 module
+Adafruit_ADS1115 converterModule;
+
+// OLED display
 Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_WIDTH, DISPLAY_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
 void setup() {
   get_count();
 
-  pinMode(SENS_0_PIN, INPUT);
+  // Start converter
+  converterModule.setDataRate(RATE_ADS1115_64SPS);  // 128SPS - default
+  converterModule.begin();
 
   setupTimer1();
 
@@ -63,7 +75,7 @@ void loop() {
   if (sens_read_t1 - sens_read_t0 >= SENS_POLLING_INTERVAL) {
     sens_read_t0 = sens_read_t1;
 
-    sens_0_value = analogRead(SENS_0_PIN);
+    sens_0_value = converterModule.readADC_SingleEnded(CHANNEL_1);
 
     if (sens_low_lvl_flag && sens_0_value > UPPER_THRESHOLD) {
       sens_low_lvl_flag = false;
@@ -99,14 +111,15 @@ ISR(TIMER1_COMPA_vect) {
   display.println();
   display.setTextSize(2);
 
-  display.print("sens: ");
-  display.println(sens_0_value);
+  display.print("S: ");
+  display.println((float)sens_0_value * K_PARAM + B_PARAM);
+  // display.println(sens_0_value);
 
   display.setTextSize(1);
   display.println();
   display.setTextSize(2);
 
-  display.print("T: ");
+  display.print("T = ");
   if (cycle_T == 0) {
     display.println("n-a");
   } else {
