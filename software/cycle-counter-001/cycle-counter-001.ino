@@ -77,6 +77,10 @@ void loop() {
 
     sens_0_value = converterModule.readADC_SingleEnded(CHANNEL_1);
 
+    // Update cycle period
+    cycle_T = sens_read_t1 - cycle_t0;
+    cycle_t0 = sens_read_t1;
+
     if (sens_low_lvl_flag && sens_0_value > UPPER_THRESHOLD) {
       sens_low_lvl_flag = false;
     }
@@ -88,10 +92,6 @@ void loop() {
       // if count reach number of cycle to save & excluding the case of count == 0
       if (!(count % CYCLES_PER_SAVE) && count != 0) {
         save_count();
-
-        // Update cycle time
-        cycle_T = sens_read_t1 - cycle_t0;
-        cycle_t0 = sens_read_t1;
       }
     }
   }
