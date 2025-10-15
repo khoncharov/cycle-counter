@@ -20,14 +20,14 @@
 #define DISPLAY_WIDTH 128
 #define DISPLAY_HEIGHT 64
 
-#define TIME_FACTOR 1.3 / (CYCLES_PER_SAVE * 1000)  // 1.25 - time coeff; 1000 ms to s
+#define TIME_FACTOR 1.3 / 1000  // 1.3 - time coeff; ms to s
 
-#define UPPER_THRESHOLD 12790  // pressure 760
-#define LOWER_THRESHOLD 12000  // pressure 720
+#define UPPER_THRESHOLD 12800
+#define LOWER_THRESHOLD 11900
 
-// Regression params - y(x) = k * x + b
-#define K_PARAM 0.075
-#define B_PARAM -200  // default -198.907
+// Regression coeffs - y(x) = k * x + b
+#define K_COEFF 0.075
+#define B_COEFF -200  // default -198.907
 
 #define MEMO_DATA_SIZE 3  // bytes
 #define MEMO_BLOCKS 341
@@ -36,16 +36,16 @@
 
 unsigned int memo_pos = 0;  // first byte in EEPROM which stores Count (2bytes) & CRC (1byte)
 
-volatile unsigned int sens_0_value = 0;
+unsigned int sens_0_value = 0;
 
-unsigned long sens_read_t0;
-unsigned long sens_read_t1;
+unsigned long time_t0;
+unsigned long time_t1;
 
-volatile unsigned int count = 0;
-bool sens_low_lvl_flag = true;
+unsigned int count = 0;
+bool sens_flag = true;
 
 unsigned long cycle_t0 = 0;          // initial time for CYCLES_PER_SAVE
-volatile unsigned long cycle_T = 0;  // time period of CYCLES_PER_SAVE
+unsigned long cycle_T = 0;  // time period of CYCLES_PER_SAVE
 
 // ADS1115 module
 Adafruit_ADS1115 converterModule;
@@ -66,28 +66,29 @@ void setup() {
   display.begin(0, true);  // we dont use the i2c address but we will reset!
   display.clearDisplay();
 
-  sens_read_t0 = millis();
+  time_t0 = millis();
+  cycle_t0 = time_t0;
 }
 
 void loop() {
-  sens_read_t1 = millis();
+  time_t1 = millis();
 
-  if (sens_read_t1 - sens_read_t0 >= SENS_POLLING_INTERVAL) {
-    sens_read_t0 = sens_read_t1;
+  if (time_t1 - time_t0 >= SENS_POLLING_INTERVAL) {
+    time_t0 = time_t1;
 
     sens_0_value = converterModule.readADC_SingleEnded(CHANNEL_1);
 
-    // Update cycle period
-    cycle_T = sens_read_t1 - cycle_t0;
-    cycle_t0 = sens_read_t1;
-
-    if (sens_low_lvl_flag && sens_0_value > UPPER_THRESHOLD) {
-      sens_low_lvl_flag = false;
+    if (sens_flag && sens_0_value > UPPER_THRESHOLD) {
+      sens_flag = false;
     }
 
-    if (!sens_low_lvl_flag && sens_0_value < LOWER_THRESHOLD) {
-      sens_low_lvl_flag = true;
+    if (!sens_flag && sens_0_value < LOWER_THRESHOLD) {
+      sens_flag = true;
       count += 1;
+
+      // Update cycle period
+      cycle_T = time_t1 - cycle_t0;
+      cycle_t0 = time_t1;
 
       // if count reach number of cycle to save & excluding the case of count == 0
       if (!(count % CYCLES_PER_SAVE) && count != 0) {
@@ -101,29 +102,36 @@ ISR(TIMER1_COMPA_vect) {
   display.clearDisplay();
 
   display.setTextSize(2);
+  // display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(2, 0);
 
   display.print("> ");
   display.println(count);
-
+  
   display.setTextSize(1);
   display.println();
   display.setTextSize(2);
 
   display.print("S: ");
-  display.println((float)sens_0_value * K_PARAM + B_PARAM);
+  display.println((float)sens_0_value * K_COEFF + B_COEFF);
   // display.println(sens_0_value);
 
   display.setTextSize(1);
   display.println();
   display.setTextSize(2);
 
-  display.print("T = ");
-  if (cycle_T == 0) {
-    display.println("n-a");
+  display.print("T");
+  display.setTextSize(1);
+  display.print(" ");
+  display.print(sens_flag);
+  display.setTextSize(2);
+  display.print(" = ");
+  if (cycle_T < 1) {
+    display.print("n-a");
   } else {
-    display.println((float)cycle_T * TIME_FACTOR);
+    display.print((float)cycle_T * TIME_FACTOR);
+    // display.println((float)cycle_T / 1000);    
   }
 
   display.display();

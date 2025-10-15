@@ -9,7 +9,8 @@ MODE description:
 
 #define MODE "read"
 
-const unsigned int COUNT = 0  // MAX VALUE 65535
+// !!! DIVIDE BY 10 => 321 to save => 32 to write
+const unsigned int COUNT = 0;  // MAX VALUE 65535
 
 void setup() {
   Serial.begin(9600);
