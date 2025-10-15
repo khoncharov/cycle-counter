@@ -41,7 +41,7 @@ unsigned int sens_0_value = 0;
 unsigned long time_t0;
 unsigned long time_t1;
 
-unsigned int count = 0;
+unsigned long count = 0;
 bool sens_flag = true;
 
 unsigned long cycle_t0 = 0;          // initial time for CYCLES_PER_SAVE
@@ -108,7 +108,7 @@ ISR(TIMER1_COMPA_vect) {
 
   display.print("> ");
   display.println(count);
-  
+
   display.setTextSize(1);
   display.println();
   display.setTextSize(2);
@@ -131,7 +131,7 @@ ISR(TIMER1_COMPA_vect) {
     display.print("n-a");
   } else {
     display.print((float)cycle_T * TIME_FACTOR);
-    // display.println((float)cycle_T / 1000);    
+    // display.println((float)cycle_T / 1000);
   }
 
   display.display();
@@ -150,15 +150,21 @@ void setupTimer1(void) {
 }
 
 void get_count(void) {
+  unsigned long saved_count = 0;
+  unsigned long save_pos = 0;
+
   for (unsigned int pos = 0; pos < MEMO_CELLS_NUM; pos += MEMO_DATA_SIZE) {
     unsigned int read_value;
     EEPROM.get(pos, read_value);
 
-    if (read_value * CYCLES_PER_SAVE > count) {
-      count = read_value * CYCLES_PER_SAVE;
-      memo_pos = pos;
+    if (saved_count < (unsigned long)read_value) {
+      saved_count = (unsigned long)read_value;
+      save_pos = pos;
     }
   }
+
+  count = saved_count * CYCLES_PER_SAVE;
+  memo_pos = save_pos;
 }
 
 void save_count(void) {
