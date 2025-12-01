@@ -5,18 +5,15 @@
 #include <EEPROM.h>
 #include <Adafruit_ADS1X15.h>
 
-#define TICKS_NUM 25000  // 400ms
+#define TICKS_NUM 25000  // 400 ms
 
 #define SENS_POLLING_INTERVAL 100
 
 #define MODULE_1_ADDRESS 0x48
 #define CHANNEL_1 0
 
-#define OLED_MOSI 11  // SDA pin D11 (default)
-#define OLED_CLK 13   // SCK pin D13 (default)
-#define OLED_DC 9     // pin D9 - user defined pin
-#define OLED_CS 8     // pin D8 - user defined pin (chip select)
-#define OLED_RST 10   // RES pin D10 - user defined pin
+#define I2C_ADDRESS 0x3c
+#define OLED_RESET -1
 #define DISPLAY_WIDTH 128
 #define DISPLAY_HEIGHT 64
 
@@ -37,6 +34,9 @@
 unsigned int memo_pos = 0;  // first byte in EEPROM which stores Count (2bytes) & CRC (1byte)
 
 unsigned int sens_0_value = 0;
+unsigned int sens_smoothed = 0;
+float smoothing_factor = 0.3f;
+
 
 unsigned long time_t0;
 unsigned long time_t1;
@@ -53,7 +53,7 @@ volatile bool need_display_update = false;
 Adafruit_ADS1115 converterModule;
 
 // OLED display
-Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_WIDTH, DISPLAY_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
+Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
 
 void setup() {
   get_count();
@@ -65,8 +65,10 @@ void setup() {
   setupTimer1();
 
   // Start OLED
-  display.begin(0, true);  // we dont use the i2c address but we will reset!
-  display.clearDisplay();
+  delay(250);
+  display.begin(I2C_ADDRESS, true);
+  display.display();
+  delay(500);
 
   time_t0 = millis();
   cycle_t0 = time_t0;
@@ -79,12 +81,13 @@ void loop() {
     time_t0 = time_t1;
 
     sens_0_value = converterModule.readADC_SingleEnded(CHANNEL_1);
+    sens_smoothed = (unsigned int)(smoothing_factor * (float)sens_0_value + (1.0f - smoothing_factor) * (float)sens_smoothed);
 
-    if (sens_flag && sens_0_value > UPPER_THRESHOLD) {
+    if (sens_flag && sens_smoothed > UPPER_THRESHOLD) {
       sens_flag = false;
     }
 
-    if (!sens_flag && sens_0_value < LOWER_THRESHOLD) {
+    if (!sens_flag && sens_smoothed < LOWER_THRESHOLD) {
       sens_flag = true;
       count += 1;
 
@@ -149,7 +152,8 @@ void save_count(void) {
 }
 
 void update_display(void) {
-  float sens_display_value = (float)sens_0_value * K_COEFF + B_COEFF;
+  unsigned int sens_display_value = sens_smoothed;
+  // float sens_display_value = (float)sens_smoothed * K_COEFF + B_COEFF;
   float cycle_T_display_value = (float)cycle_T * TIME_FACTOR;
 
   display.clearDisplay();
@@ -166,7 +170,8 @@ void update_display(void) {
   display.setTextSize(2);
 
   display.print("S: ");
-  display.println(sens_display_value, 1);
+  // display.println(sens_display_value, 1);
+  display.println(sens_display_value);
 
   display.setTextSize(1);
   display.println();
