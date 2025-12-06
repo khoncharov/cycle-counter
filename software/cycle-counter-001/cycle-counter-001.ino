@@ -20,7 +20,7 @@
 #define DISPLAY_WIDTH 128
 #define DISPLAY_HEIGHT 64
 
-#define TIME_FACTOR 0.0013f  // time coeff = 1.3 for 1 ms
+#define TIME_FACTOR 0.001f  // ms to s
 
 #define UPPER_THRESHOLD 12800
 #define LOWER_THRESHOLD 11900
@@ -65,7 +65,7 @@ void setup() {
   setupTimer1();
 
   // Start OLED
-  display.begin(0, true);  // we dont use the i2c address but we will reset!
+  display.begin(0, true);
   display.clearDisplay();
 
   time_t0 = millis();
