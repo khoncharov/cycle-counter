@@ -58,13 +58,11 @@ Adafruit_SH1106G display = Adafruit_SH1106G(DISPLAY_WIDTH, DISPLAY_HEIGHT, OLED_
 void setup() {
   get_count();
 
-  // Start converter
-  converterModule.setDataRate(RATE_ADS1115_64SPS);  // 128SPS - default
   converterModule.begin();
+  converterModule.setDataRate(RATE_ADS1115_64SPS);
 
   setupTimer1();
 
-  // Start OLED
   display.begin(0, true);
   display.clearDisplay();
 
