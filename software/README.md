@@ -4,10 +4,6 @@
 
 Description
 
-## cycle-counter-000
-
-Counter based on Arduino NANO internal ADC
-
 ## cycle-counter-001
 
 HW config: ARDUINO NANO, ADS1115, OLED SPI display
